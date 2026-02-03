@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SVG Drawing Tool</title>
+
+  <style>
+    :root{--bg:#071126;--card:#0b1220;--accent:#06b6d4;--muted:#9aa4b2}
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter,system-ui,-apple-system,'Segoe UI',Roboto,Arial;
+      background:linear-gradient(180deg,#071126 0%, #071129 100%);
+      color:#e6eef6;
+      padding:1.25rem
+    }
+    .container{max-width:1100px;margin:0 auto}
+    .toolbar{margin-bottom:.75rem}
+    .toolbar h1{margin:0 0 .25rem;font-size:1.3rem}
+    .desc{color:var(--muted);margin:0 0 .75rem}
+    .controls{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+    .controls label{display:flex;flex-direction:column;font-size:.9rem;color:var(--muted)}
+    .controls input[type="color"],.controls select{
+      padding:.35rem;border-radius:8px;
+      border:1px solid rgba(255,255,255,0.04);
+      background:transparent;color:inherit
+    }
+    .controls input[type="range"]{width:120px}
+    .checkbox-inline{display:flex;align-items:center;gap:.4rem;color:var(--muted)}
+    .controls button{
+      background:var(--accent);
+      color:#04202a;
+      padding:.45rem .6rem;
+      border-radius:8px;
+      border:none;
+      cursor:pointer
+    }
+    .controls button[disabled]{opacity:.5;cursor:not-allowed}
+
+    .canvas-wrap{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border-radius:12px;
+      padding:.5rem;
+      border:1px solid rgba(255,255,255,0.03)
+    }
+    #svgCanvas{
+      width:100%;
+      height:60vh;
+      display:block;
+      border-radius:8px;
+      background:linear-gradient(180deg, rgba(6,182,212,0.03), transparent);
+    }
+    .footer{margin-top:.5rem;color:var(--muted)}
+    @media (max-width:520px){
+      #svgCanvas{height:50vh}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <header class="toolbar">
+      <h1>SVG Drawing Tool</h1>
+
+      <div class="controls">
+        <label>Tool
+          <select id="toolSelect">
+            <option value="pen">Pen</option>
+            <option value="line">Line</option>
+            <option value="rect">Rectangle</option>
+            <option value="circle">Circle</option>
+          </select>
+        </label>
+
+        <label>Stroke
+          <input id="strokeColor" type="color" value="#0b1220">
+        </label>
+
+        <label>Fill
+          <input id="fillColor" type="color" value="#06b6d4">
+        </label>
+
+        <label>Width
+          <input id="strokeWidth" type="range" min="1" max="12" value="2">
+        </label>
+
+        <label class="checkbox-inline">
+          <input id="useFill" type="checkbox"> Fill
+        </label>
+
+        <button id="undoBtn">Undo</button>
+        <button id="clearBtn">Clear</button>
+        <button id="exportBtn">Download SVG</button>
+      </div>
+
+      <p class="desc">
+        Draw using mouse or touch • Ctrl/Cmd + Z to undo
+      </p>
+    </header>
+
+    <section class="canvas-wrap">
+      <svg id="svgCanvas" viewBox="0 0 1000 600"></svg>
+    </section>
+
+    <footer class="footer">
+      <small>Built with HTML, CSS & JavaScript</small>
+    </footer>
+  </main>
+
+  <script>
+    const svg = document.getElementById('svgCanvas');
+    const toolSelect = document.getElementById('toolSelect');
+    const strokeColor = document.getElementById('strokeColor');
+    const fillColor = document.getElementById('fillColor');
+    const strokeWidth = document.getElementById('strokeWidth');
+    const useFill = document.getElementById('useFill');
+    const undoBtn = document.getElementById('undoBtn');
+    const clearBtn = document.getElementById('clearBtn');
+    const exportBtn = document.getElementById('exportBtn');
+
+    let drawing = false, current = null, startX = 0, startY = 0, pathData = '';
+    const stack = [];
+
+    function svgPoint(x,y){
+      const pt = svg.createSVGPoint();
+      pt.x = x; pt.y = y;
+      return pt.matrixTransform(svg.getScreenCTM().inverse());
+    }
+    const createEl = n => document.createElementNS('http://www.w3.org/2000/svg', n);
+
+    svg.addEventListener('pointerdown', e=>{
+      const p = svgPoint(e.clientX, e.clientY);
+      startX=p.x; startY=p.y;
+      const stroke=strokeColor.value;
+      const fill=useFill.checked?fillColor.value:'none';
+      const sw=strokeWidth.value;
+
+      if(toolSelect.value==='pen'){
+        current=createEl('path');
+        pathData=`M ${startX} ${startY}`;
+        current.setAttribute('d',pathData);
+        current.setAttribute('fill','none');
+      }
+      if(toolSelect.value==='line'){
+        current=createEl('line');
+        current.setAttribute('x1',startX);
+        current.setAttribute('y1',startY);
+        current.setAttribute('x2',startX);
+        current.setAttribute('y2',startY);
+      }
+      if(toolSelect.value==='rect'){
+        current=createEl('rect');
+        current.setAttribute('x',startX);
+        current.setAttribute('y',startY);
+        current.setAttribute('width',0);
+        current.setAttribute('height',0);
+        current.setAttribute('fill',fill);
+      }
+      if(toolSelect.value==='circle'){
+        current=createEl('circle');
+        current.setAttribute('cx',startX);
+        current.setAttribute('cy',startY);
+        current.setAttribute('r',0);
+        current.setAttribute('fill',fill);
+      }
+      current.setAttribute('stroke',stroke);
+      current.setAttribute('stroke-width',sw);
+      svg.appendChild(current);
+      drawing=true;
+    });
+
+    svg.addEventListener('pointermove', e=>{
+      if(!drawing) return;
+      const p = svgPoint(e.clientX,e.clientY);
+      if(toolSelect.value==='pen'){
+        pathData+=` L ${p.x} ${p.y}`;
+        current.setAttribute('d',pathData);
+      }
+      if(toolSelect.value==='line'){
+        current.setAttribute('x2',p.x);
+        current.setAttribute('y2',p.y);
+      }
+      if(toolSelect.value==='rect'){
+        current.setAttribute('width',Math.abs(p.x-startX));
+        current.setAttribute('height',Math.abs(p.y-startY));
+      }
+      if(toolSelect.value==='circle'){
+        const r=Math.hypot(p.x-startX,p.y-startY);
+        current.setAttribute('r',r);
+      }
+    });
+
+    window.addEventListener('pointerup', ()=>{
+      if(drawing){
+        stack.push(current);
+        current=null;
+        drawing=false;
+      }
+    });
+
+    undoBtn.onclick=()=>{const el=stack.pop(); if(el) el.remove();}
+    clearBtn.onclick=()=>{svg.innerHTML=''; stack.length=0;}
+    exportBtn.onclick=()=>{
+      const data=new XMLSerializer().serializeToString(svg);
+      const blob=new Blob([data],{type:'image/svg+xml'});
+      const a=document.createElement('a');
+      a.href=URL.createObjectURL(blob);
+      a.download='drawing.svg';
+      a.click();
+    };
+  </script>
+</body>
+</html>
