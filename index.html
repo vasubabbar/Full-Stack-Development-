@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Character Counter</title>
+
+  <style>
+    :root{
+      --bg:#0f1724;
+      --card:#0b1220;
+      --accent:#7c3aed;
+      --accent-2:#06b6d4;
+      --muted:#9aa4b2;
+      --danger:#ef4444;
+      --warning:#f59e0b;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, 'Segoe UI', Roboto, Arial;
+      background: linear-gradient(180deg,#071126 0%, #071129 100%);
+      color:#e6eef6;
+      padding:2rem;
+    }
+    .container{max-width:720px;margin:0 auto}
+    h1{margin:0 0 .25rem;font-size:1.6rem}
+    .desc{color:var(--muted);margin:0 0 1rem}
+    .card{
+      background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+      border:1px solid rgba(255,255,255,0.03);
+      padding:1rem;
+      border-radius:12px;
+      box-shadow:0 6px 18px rgba(2,6,23,0.6);
+    }
+    .label{display:block;margin-bottom:.5rem;color:var(--muted)}
+    textarea{
+      width:100%;
+      min-height:120px;
+      padding:.75rem;
+      border-radius:8px;
+      border:1px solid rgba(255,255,255,0.04);
+      background:transparent;
+      color:inherit;
+      font-size:1rem;
+      outline:none;
+    }
+    textarea:focus{
+      border-color:var(--accent);
+      box-shadow:0 4px 18px rgba(124,58,237,0.12);
+    }
+    .bar{
+      height:8px;
+      background:rgba(255,255,255,0.05);
+      border-radius:999px;
+      margin:.75rem 0;
+      overflow:hidden;
+    }
+    .progress{
+      height:100%;
+      width:0%;
+      background:linear-gradient(90deg,var(--accent),var(--accent-2));
+      transition:width .18s ease;
+    }
+    .progress.warning{background:linear-gradient(90deg,var(--warning),#fbbf24)}
+    .progress.danger{background:linear-gradient(90deg,var(--danger),#fb7185)}
+    .meta{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:1rem;
+    }
+    .counter{font-weight:600}
+    .remaining{color:var(--muted)}
+    .footer{margin-top:.75rem;color:var(--muted)}
+    .sr-only{
+      position:absolute;width:1px;height:1px;padding:0;margin:-1px;
+      overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0
+    }
+    @media (max-width:480px){
+      body{padding:1rem}
+      h1{font-size:1.25rem}
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <h1>Live Character Counter</h1>
+    <p class="desc">This demo shows real-time character counting with visual feedback.</p>
+
+    <section class="card">
+      <label for="message" class="label">Your message</label>
+      <textarea id="message" rows="6" maxlength="200"
+        placeholder="Type your message..."
+        aria-describedby="counter ariaStatus"></textarea>
+
+      <div class="bar">
+        <div id="progress" class="progress"></div>
+      </div>
+
+      <div class="meta">
+        <div id="counter" class="counter">
+          <span id="count">0</span>/<span id="limit">200</span>
+        </div>
+        <div id="remaining" class="remaining">200 characters left</div>
+      </div>
+
+      <div id="ariaStatus" class="sr-only" aria-live="polite"></div>
+    </section>
+
+    <footer class="footer">
+      <small>Max length: <strong>200</strong> characters • Built with HTML, CSS & JS</small>
+    </footer>
+  </main>
+
+  <script>
+    const textarea = document.getElementById('message');
+    const countEl = document.getElementById('count');
+    const limitEl = document.getElementById('limit');
+    const progress = document.getElementById('progress');
+    const remaining = document.getElementById('remaining');
+    const aria = document.getElementById('ariaStatus');
+
+    const LIMIT = parseInt(limitEl.textContent, 10) || 200;
+
+    function update() {
+      const len = textarea.value.length;
+      countEl.textContent = len;
+
+      const pct = Math.min((len / LIMIT) * 100, 100);
+      progress.style.width = pct + '%';
+
+      const left = LIMIT - len;
+      progress.classList.toggle('warning', left <= 20 && left > 0);
+      progress.classList.toggle('danger', left <= 0);
+
+      if (left > 0) {
+        remaining.textContent = `${left} characters left`;
+        aria.textContent = remaining.textContent;
+      } else {
+        remaining.textContent = `Limit reached`;
+        aria.textContent = `Limit reached`;
+      }
+    }
+
+    update();
+    textarea.addEventListener('input', update);
+    textarea.addEventListener('paste', () => setTimeout(update, 0));
+  </script>
+</body>
+</html>
